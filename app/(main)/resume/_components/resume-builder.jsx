@@ -24,6 +24,7 @@ import { useUser } from "@clerk/nextjs";
 import { entriesToMarkdown } from "@/app/lib/helper";
 import { resumeSchema } from "@/app/lib/schema";
 
+
 export default function ResumeBuilder({ initialContent }) {
   const [activeTab, setActiveTab] = useState("edit");
   const [previewContent, setPreviewContent] = useState(initialContent);
@@ -114,37 +115,25 @@ export default function ResumeBuilder({ initialContent }) {
   const generatePDF = async () => {
   setIsGenerating(true);
   try {
+    const html2pdf = (await import("html2pdf.js")).default; // 👈 dynamically import only on client
     const element = document.getElementById("resume-pdf");
-    if (!element) throw new Error("Resume element not found");
 
-    // Dynamically import browser-only modules
-    const html2canvas = (await import("html2canvas")).default;
-    const jsPDF = (await import("jspdf")).default;
+    const opt = {
+      margin: [15, 15],
+      filename: "resume.pdf",
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+    };
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-    });
-
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save("resume.pdf");
-  } catch (err) {
-    console.error("PDF generation failed", err);
+    await html2pdf().set(opt).from(element).save();
+  } catch (error) {
+    console.error("PDF generation error:", error);
   } finally {
     setIsGenerating(false);
   }
 };
+
 
   const onSubmit = async (data) => {
     try {
@@ -159,6 +148,7 @@ export default function ResumeBuilder({ initialContent }) {
       console.error("Save error:", error);
     }
   };
+const sanitizedContent = previewContent.replace(/lab\([^)]+\)/gi, "#000000");
 
   return (
     <div data-color-mode="light" className="space-y-4">
@@ -417,13 +407,14 @@ export default function ResumeBuilder({ initialContent }) {
           </div>
           <div className="hidden">
             <div id="resume-pdf">
-              <MDEditor.Markdown
-                source={previewContent}
-                style={{
-                  background: "white",
-                  color: "black",
-                }}
-              />
+             <MDEditor.Markdown
+  source={sanitizedContent}
+  style={{
+    background: "white",
+    color: "black",
+  }}
+/>
+
             </div>
           </div>
         </TabsContent>
